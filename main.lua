@@ -1,6 +1,7 @@
 --[[
-	Lobotomizer Script Custom Version
+	Lobotomizer Script Đã Sửa Lỗi Hiện Menu + Thêm Auto Parry
 ]]
+-- Thay thế link Rayfield chính thức chạy mượt trên Delta
 local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source.lua'))()
 local Window = Rayfield:CreateWindow({Name = 'the "debug" button they call it', LoadingTitle = 'ready for the chaos?'})
 local Players = game:GetService('Players')
@@ -239,4 +240,67 @@ local function setAttackSpeedValue(val)
 		local units = workspace:WaitForChild('Units', 2)
 		local playerUnit = units and units:FindFirstChild(LocalPlayer.Name)
 		local charStats = playerUnit and playerUnit:FindFirstChild('CharStats')
-		local attackSpeed = charStats and charStats:FindFirstChild
+		local attackSpeed = charStats and charStats:FindFirstChild('AttackSpeed')
+		if attackSpeed then attackSpeed.Value = val end
+	end)
+end
+
+WeaponTab:CreateToggle({
+	Name = 'Infinite Attack Speed',
+	CurrentValue = false,
+	Callback = function(Value)
+		infiniteAttackSpeed = Value
+		setAttackSpeedValue(infiniteAttackSpeed and math.huge or attackSpeedValue)
+	end,
+})
+
+task.spawn(function()
+	while task.wait(0.005) do
+		if autoParryEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			pcall(function()
+				local myHRP = LocalPlayer.Character.HumanoidRootPart
+				local unitsFolder = workspace:FindFirstChild("Units")
+				if unitsFolder then
+					for _, unit in ipairs(unitsFolder:GetChildren()) do
+						if unit:IsA("Model") and unit.Name ~= LocalPlayer.Name and unit.Name ~= "Clerk" then
+							local enemyHRP = unit:FindFirstChild("HumanoidRootPart")
+							local isAttacking = unit:FindFirstChild("Attacking") or unit:FindFirstChild("Attack") or unit:FindFirstChild("Action")
+							if enemyHRP and isAttacking then
+								local dist = (myHRP.Position - enemyHRP.Position).Magnitude
+								if dist <= parryDistance then
+									local parryRemote = RepStorage:FindFirstChild("Assets") 
+										and RepStorage.Assets:FindFirstChild("RemoteEvents") 
+										and (RepStorage.Assets.RemoteEvents:FindFirstChild("ParryEvent") 
+										or RepStorage.Assets.RemoteEvents:FindFirstChild("Parry")
+										or RepStorage.Assets.RemoteEvents:FindFirstChild("Block"))
+									if parryRemote then
+										parryRemote:FireServer()
+										task.wait(0.15)
+										break
+									end
+								end
+							end
+						end
+					end
+				end
+			end)
+		end
+	end
+end)
+
+LocalPlayer.Backpack.ChildAdded:Connect(function(child)
+    if child:IsA("Tool") then applyHitboxToWeapon(child) applyDamageToTool(child) end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(character)
+	task.wait(1)
+	setAttackSpeedValue(infiniteAttackSpeed and math.huge or attackSpeedValue)
+	applyAllDamageToWeapons()
+    character.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then applyHitboxToWeapon(child) applyDamageToTool(child) end
+    end)
+end)
+
+task.spawn(function()
+	while task.wait(1) do applyAllDamageToWeapons() end
+end)
